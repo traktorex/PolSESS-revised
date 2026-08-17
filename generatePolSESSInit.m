@@ -14,40 +14,43 @@
 % paths to speech corpora
 
 % the absolute path to downloaded emu corpus: https://mowa.clarin-pl.eu/korpusy
-emuDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\clarin_emu';
+emuDBPath = 'C:\datasety\clarin_emu';
 
 % the path to downloaded multilingual LibriSpeech (only PL part): https://www.openslr.org/94/
-libriSpeechPLDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\MultilingualLibriSpeech_mls_polish\mls_polish';
+libriSpeechPLDBPath = 'C:\datasety\mls';
+
+% the path to downloaded LibriSpeech (English, clean subsets): https://www.openslr.org/12
+libriSpeechENDBPath = 'C:\datasety\LibriMix\datasetyLibriMixdatasets';
 
 % paths to environmental scenes corpora
 
 % the path to WHAM  http://wham.whisper.ai/
-whamNoiseDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\WHAM\wham_noise\wham_noise';
+whamNoiseDBPath = 'C:\datasety\wham_noise\wham_noise';
 
 % the path to TUT 2027: https://zenodo.org/records/400515
-tutDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\TUT-acoustic-scenes-2017';
+tutDBPath = 'C:\datasety\TUT-acoustic-scenes-2017';
 
 % the path to TAU-urban-acoustic-scenes
 % please reorganize the data so that all of the recordings are stored in single audio
 % directory!
-tauDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\TAU-urban-acoustic-scenes';
+tauDBPath = 'C:\datasety\TAU-urban-acoustic-scenes-2019-development';
 
 % paths to sound events corpora
 
 % the path to ESC50 events https://github.com/karolpiczak/ESC-50
-esc50eDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\ESC-50-master\ESC-50-master\audio';
+esc50eDBPath = 'C:\datasety\ESC-50-master\audio';
 
 % the path to FSD50K events https://zenodo.org/records/4060432
-fsd50kDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\FSD50K';
+fsd50kDBPath = 'C:\datasety\FSD50K';
 
 %% define other important information about the corpus
 
 % the output where the generated corpus will be stored
-outputDir = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\PolSMSE';
+outputDir = 'C:\datasety\';
 
 % the name of the created corpus - it will be the name of the folder which
 % stores the corpus
-theNameofDB = 'PolSESS_TEMP';
+theNameofDB = 'PolSESS_C_final_128_v2_outdoor';
 
 % the desired frequency of output files. Can be 8000 or 16000Hz
 outputFreq = 8000;
@@ -58,18 +61,29 @@ outputFreq = 8000;
 mixLength = 4;
 
 % declare how many files you want to generate for the current subset
-howManyToGenerate = 1000;
+howManyToGenerate = 6400;
 
 % type one of these: test | val | train
 % it denotes the subset you currently want to generate
-subset = 'train';
+subset = 'test';
+
+% choose the type of scenes to include: 'indoor' | 'outdoor' | 'both'
+% 'indoor' - only indoor scenes with reverberation
+% 'outdoor' - only outdoor scenes without reverberation
+% 'both' - mix of indoor and outdoor scenes
+sceneTypeFilter = 'outdoor';
 
 % the speech to speech ratio range when mixing two speakers
 SSRrange = [-5 5];
 
+% range of how much the scene will be quieter than the speech mix (in decibels)
+% first value - the lowest volume of scene in relation to speech mix
+% second value - the highest volume of scene in relation to speech mix
+sceneToSpeechRange = [-8, 1];
+
 %% here are some other constants that should not rather be changed
 
-%rng("default");
+rng('shuffle');
 
 % The names of generated files are 16 randomly choosen characters
 s = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -78,7 +92,7 @@ sLength = 16;
 
 % load the references to data sources. This file can be created using
 % generateDataSources.mat
-load('dataSources.mat');
+load('dataSources_v3.mat');
 
 % load the classes of noises and events in the form of matrix which
 % specifies which event class suits to which noise class
@@ -97,6 +111,9 @@ datasrc.filePath(datasrc.source=="emu") = cellfun(@(c)fullfile(emuDBPath,c),emu_
 
 libri_only = datasrc(datasrc.source == "libriSpeech",:);
 datasrc.filePath(datasrc.source=="libriSpeech") = cellfun(@(c)fullfile(libriSpeechPLDBPath,c),libri_only.filePath,'uni',false);
+
+librispeech_clean_only = datasrc(datasrc.source == "librispeech_clean",:);
+datasrc.filePath(datasrc.source=="librispeech_clean") = cellfun(@(c)fullfile(libriSpeechENDBPath,c),librispeech_clean_only.filePath,'uni',false);
 
 wham_only = datasrc(datasrc.source == "wham",:);
 datasrc.filePath(datasrc.source=="wham") = cellfun(@(c)fullfile(whamNoiseDBPath,c),wham_only.filePath,'uni',false);
@@ -167,6 +184,16 @@ data_speech = data(data.role == 'speech',:);
 % select the sources of scenes from given subset
 data_scene = data(data.role == 'envScene',:);
 
+% pre-filter scenes by indoor/outdoor to avoid wasted iterations
+if ~strcmp(sceneTypeFilter, 'both')
+    sceneKeep = false(height(data_scene), 1);
+    for si = 1:height(data_scene)
+        isIndoor = (backgroundClasses.(string(data_scene.class(si)))(2) == "in");
+        sceneKeep(si) = strcmp(sceneTypeFilter, 'indoor') == isIndoor;
+    end
+    data_scene = data_scene(sceneKeep, :);
+end
+
 % select the sources of events from given subset
 data_event = data(data.role == 'events',:);
 
@@ -177,17 +204,28 @@ sizeEvent = size(data_event,1);
 
 % the matlab table which will be storing all the metadata about generating
 % corpus
-corpus = table('Size',[howManyToGenerate, 31],...
+corpus = table('Size',[howManyToGenerate, 34],...
     'VariableNames',{'subset',	'speech1OryginalPath', 'speech1Start','speech1End',	'speech2OryginalPath', ...
-    'speech2Start','speech2End','SSR',	'sceneOryginalPath','sceneStart','sceneEnd', 'eventOryginalPath','eventStart','eventEnd','speaker1File', ...
+    'speech2Start','speech2End','SSR',	'sceneOryginalPath','sceneStart','sceneEnd','sceneRandomDB','sceneOffsetDB','sceneVolumeGain','eventOryginalPath','eventStart','eventEnd','speaker1File', ...
     'speaker2File',	'eventFile',	'sceneFile', ...
     'reverbForSpeaker1',	'reverbForSpeaker2',	'reverbForEvent', ...
     'mixFile',	'sceneClass',	'eventClass', 'preDelayForEvent','preDelay1','preDelay2', ...
     'highCut',	'diffusion',	'decay',	'freqDamp'}, ...
-    'VariableTypes',{'string','string','double','double','string','double','double','double','string','double','double','string','double','double','string',...
+    'VariableTypes',{'string','string','double','double','string','double','double','double','string','double','double','double','double','double','string','double','double','string',...
     'string','string','string','string','string','string','string',...
     'string','string','double','double','double','double','double','double','double'});
 
+% structure for reverb settings
+processedReverbSettings = struct();
+for i = 1:height(reverbSettings)
+    rawClassName = string(reverbSettings.sceneClass(i));
+    className = matlab.lang.makeValidName(rawClassName);
+    processedReverbSettings.(className).preDelay = str2double(split(string(reverbSettings.preDelay(i))));
+    processedReverbSettings.(className).highCut = str2double(split(string(reverbSettings.highCut(i))));
+    processedReverbSettings.(className).diffusion = str2double(split(string(reverbSettings.diffusion(i))));
+    processedReverbSettings.(className).decay = str2double(split(string(reverbSettings.decay(i))));
+    processedReverbSettings.(className).freqDamp = str2double(split(string(reverbSettings.freqDamp(i))));
+end
 
 %% data generation
 
@@ -258,16 +296,38 @@ while id <= howManyToGenerate
 
     speech1samples = speaker1Duration * speaker1SampleRate;
     speaker1segmentL = speaker1SampleRate * mixLength;
-    speaker1segmentStart = randi(ceil(speech1samples - speaker1segmentL));
-    speaker1segmentEnd = speaker1segmentStart +speaker1segmentL-1;
-    [ySpeech1, fsSpeech1] = audioread(speaker1Path,[speaker1segmentStart,speaker1segmentEnd]);
+    if speech1samples > speaker1segmentL
+        speaker1segmentStart = randi(ceil(speech1samples - speaker1segmentL));
+        speaker1segmentEnd = speaker1segmentStart + speaker1segmentL - 1;
+        [ySpeech1, fsSpeech1] = audioread(speaker1Path,[speaker1segmentStart,speaker1segmentEnd]);
+    else
+        % recording is <= mixLength: read the whole file, pad symmetrically with silence
+        [ySpeech1, fsSpeech1] = audioread(speaker1Path);
+        padTotal = speaker1segmentL - size(ySpeech1, 1);
+        padBefore = floor(padTotal / 2);
+        padAfter = padTotal - padBefore;
+        ySpeech1 = [zeros(padBefore, size(ySpeech1, 2)); ySpeech1; zeros(padAfter, size(ySpeech1, 2))];
+        speaker1segmentStart = 1;
+        speaker1segmentEnd = round(speech1samples);
+    end
 
 
     speech2samples = speaker2Duration * speaker2SampleRate;
     speaker2segmentL = speaker2SampleRate * mixLength;
-    speaker2segmentStart = randi(ceil(speech2samples - speaker2segmentL));
-    speaker2segmentEnd = speaker2segmentStart +speaker2segmentL-1;
-    [ySpeech2, fsSpeech2] = audioread(speaker2Path,[speaker2segmentStart,speaker2segmentEnd]);
+    if speech2samples > speaker2segmentL
+        speaker2segmentStart = randi(ceil(speech2samples - speaker2segmentL));
+        speaker2segmentEnd = speaker2segmentStart + speaker2segmentL - 1;
+        [ySpeech2, fsSpeech2] = audioread(speaker2Path,[speaker2segmentStart,speaker2segmentEnd]);
+    else
+        % recording is <= mixLength: read the whole file, pad symmetrically with silence
+        [ySpeech2, fsSpeech2] = audioread(speaker2Path);
+        padTotal = speaker2segmentL - size(ySpeech2, 1);
+        padBefore = floor(padTotal / 2);
+        padAfter = padTotal - padBefore;
+        ySpeech2 = [zeros(padBefore, size(ySpeech2, 2)); ySpeech2; zeros(padAfter, size(ySpeech2, 2))];
+        speaker2segmentStart = 1;
+        speaker2segmentEnd = round(speech2samples);
+    end
 
 
     sceneSamples = sceneDuration * sceneSampleRate;
@@ -347,6 +407,38 @@ while id <= howManyToGenerate
         continue
     end
 
+    % now the scene volume will be adjusted to be quieter than the speech mix.
+    % the range of possible differences in volume between scene and speech mix is
+    % defined in sceneToSpeechRange variable. i.e. if sceneToSpeechRange = [-14,0]
+    % then the scene will be between 0 and 14 dB quieter than the speech mix.
+
+    % calculate RMS of scene and speechMix 
+    speechRMS = sqrt(mean(speechMix.^2));
+    sceneRMS = sqrt(mean(yScene.^2));
+
+    % Desired offset (first value in sceneToSpeechRange indicates how much 
+    % the scene will be quieter than the speech mix)
+    sceneTargetOffsetDB = sceneToSpeechRange(1);
+
+    % randomize within the range
+    sceneRandomDB = (sceneToSpeechRange(2) - sceneToSpeechRange(1))*rand();
+
+    % Total desired offset
+    totalSceneOffsetDB = sceneTargetOffsetDB + sceneRandomDB;
+
+    % Calculate target scene RMS
+    targetSceneRMS = speechRMS * 10^(totalSceneOffsetDB/20);
+
+    % Calculate gain
+    if sceneRMS > 0
+        sceneGain = targetSceneRMS / sceneRMS;
+    else
+        sceneGain = 1; % avoid division by zero
+    end
+
+    % Apply gain to scene
+    yScene = yScene * sceneGain;
+
     % next, check if the scene class is indoor or not. If indoor than apply
     % reverberation to the speech and events. In such a case the speech and
     % events will have the same reverberation parameters, except the first replection time.
@@ -354,59 +446,50 @@ while id <= howManyToGenerate
     % check if scene is indoor or not
     where = backgroundClasses.(string(sceneClass))(2);
 
+    % apply scene type filter
+    if strcmp(sceneTypeFilter, 'indoor') && where ~= "in"
+        continue; % skip outdoor scenes if only indoor is requested
+    elseif strcmp(sceneTypeFilter, 'outdoor') && where == "in"
+        continue; % skip indoor scenes if only outdoor is requested
+    end
+    % if sceneTypeFilter is 'both', accept all scenes
+
     % than apply reverberation for only indoor classes
     if(where == "in")
 
-        % read the reverb settings depending on the class
-        rset = reverbSettings(reverbSettings.sceneClass == string(sceneClass),:);
+        % Sanitize the sceneClass name to match the struct field name
+        validSceneClass = matlab.lang.makeValidName(string(sceneClass));
 
         % just in case...
-        if(isempty(rset))
+        if(~isfield(processedReverbSettings, validSceneClass))
             continue
         end
 
-        % randomly choosing the reverb parameters from the range encoded in
-        % reverbParamsForClasses.mat for given scene class
+        % read the pre-processed reverb settings directly from the struct
+        rset = processedReverbSettings.(validSceneClass);
 
-        % Pre-delay is the time between hearing direct sound and
-        % the first early reflection.
-        % The value of PreDelay is proportional to the size of the room being modeled.
-        tpd = split(string(rset.preDelay)," ");
-        tpd2 = [str2double(tpd(1)) str2double(tpd(2))];
-
-        % the two speakers have two little different preDelaytimes
+        % randomly choosing the reverb parameters from the pre-computed ranges
+        
+        % Pre-delay
+        tpd2 = rset.preDelay;
         delshift = rand*(tpd2(2)-tpd2(1));
         preDelay1 = tpd2(1) + delshift;
         preDelay2 = preDelay1 - ((delshift) * (rand*0.3));
 
-        % Lowpass filter cutoff is the –3 dB cutoff frequency.
-        % It prevents reverberation to high-frequency of the input.
-        thc = split(string(rset.highCut)," ");
-        thc2 = [str2double(thc(1)) str2double(thc(2))];
+        % Lowpass filter cutoff
+        thc2 = rset.highCut;
         highCut = thc2(1) + rand*(thc2(2)-thc2(1));
 
-        % Diffusion is proportional to the rate at which the
-        % reverb tail builds in density.
-        % Increasing Diffusion pushes the reflections closer together,
-        % thickening the sound. Reducing Diffusion creates more discrete echoes.
-        tdif = split(string(rset.diffusion)," ");
-        tdif2 = [str2double(tdif(1)) str2double(tdif(2))];
+        % Diffusion
+        tdif2 = rset.diffusion;
         diffusion = tdif2(1) + rand*(tdif2(2)-tdif2(1));
 
-        %is inversely proportional to the time it takes for reflections
-        % to run out of energy.
-        % To model a large room, use a long reverb tail (low decay factor).
-        % To model a small room, use a short reverb tail (high decay factor).;
-        tde = split(string(rset.decay)," ");
-        tde2 = [str2double(tde(1)) str2double(tde(2))];
+        % Decay
+        tde2 = rset.decay;
         decay = tde2(1) + rand*(tde2(2)-tde2(1));
 
-        % HighFrequencyDamping is proportional to the attenuation of high
-        % frequencies in the reverberation output.
-        % Setting HighFrequencyDamping to a large value makes high-frequency
-        % reflections decay faster than low-frequency reflections.
-        tfe = split(string(rset.freqDamp)," ");
-        tfe2 = [str2double(tfe(1)) str2double(tfe(2))];
+        % HighFrequencyDamping
+        tfe2 = rset.freqDamp;
         freqDamp =  tfe2(1) + rand*(tfe2(2)-tfe2(1));
 
         % generate fully wet reverb for speech
@@ -417,7 +500,6 @@ while id <= howManyToGenerate
         reverbForSpeaker2 = removeClipping(reverbForSpeaker2);
 
         % generate reverb for event
-        % use the same reverb as for speech but with different preDelay
         preDelayForEvent = tpd2(1) + rand*(tpd2(2)-tpd2(1));
         [reverbForEvent] = generateReverb(yEvent,outputFreq,preDelayForEvent,highCut,diffusion,decay,freqDamp,1);
         reverbForEvent = removeClipping(reverbForEvent);
@@ -492,6 +574,9 @@ while id <= howManyToGenerate
     corpus.sceneOryginalPath(id) = string(scenePath);
     corpus.sceneStart(id) = sceneSegmentStart;
     corpus.sceneEnd(id) = sceneSegmentEnd;
+    corpus.sceneRandomDB(id) = sceneRandomDB;
+    corpus.sceneOffsetDB(id) = totalSceneOffsetDB;
+    corpus.sceneVolumeGain(id) = sceneGain;
     corpus.eventOryginalPath(id) = string(eventPath);
     corpus.eventStart(id) = eventSegmentStart;
     corpus.eventEnd(id) = eventSegmentEnd;
@@ -506,6 +591,10 @@ while id <= howManyToGenerate
         corpus.reverbForSpeaker1(id) = string(reverbForSpeaker1File);
         corpus.reverbForSpeaker2(id) = string(reverbForSpeaker2File);
         corpus.reverbForEvent(id) = string(reverbForEventFile);
+    else
+        corpus.reverbForSpeaker1(id) = missing;
+        corpus.reverbForSpeaker2(id) = missing;
+        corpus.reverbForEvent(id) = missing;
     end
 
     corpus.sceneClass(id) = string(sceneClass);
@@ -563,3 +652,4 @@ end
 
 %% save the final created metadata file to disc
 save(['corpus_' theNameofDB '_' subset '_final.mat'],'corpus');
+writetable(corpus, ['corpus_' theNameofDB '_' subset '_final.csv']);
