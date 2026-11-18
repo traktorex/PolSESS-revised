@@ -2,7 +2,7 @@
 
 A MATLAB generator of simulated two-speaker mixtures for speech separation and enhancement. Each mixture combines Polish and other read speech with an acoustic scene, a sound event and reverberation. Every layer is saved as its own time-aligned file next to the mixture, so a layer can be removed from the mixture by adding its phase-inverted copy (MM-IPC, mix modification by inverted phase cancellation).
 
-This repository is a revision of the original Pol-SESS generator by Mariusz Kleć, [github.com/mklec/PolSESS](https://github.com/mklec/PolSESS). The original commit is kept in this repository's history. If you use the generator or data generated with it, please cite the original papers (below).
+This repository is a revision of the original Pol-SESS generator [github.com/mklec/PolSESS](https://github.com/mklec/PolSESS). The original commit is kept in this repository's history. If you use the generator or data generated with it, please cite the original papers (below).
 
 ## Speech sources in `dataSources_v3`
 
