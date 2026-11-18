@@ -4,14 +4,6 @@ A MATLAB generator of simulated two-speaker mixtures for speech separation and e
 
 This repository is a revision of the original Pol-SESS generator by Mariusz Kleć, [github.com/mklec/PolSESS](https://github.com/mklec/PolSESS). The original commit is kept in this repository's history. If you use the generator or data generated with it, please cite the original papers (below).
 
-## What the revision changes
-
-1. **Scene level.** The original generator added the background scene at its recorded level, usually far below the speech. The revised generator scales the scene so that its RMS level, relative to the two-speaker mixture, is drawn uniformly between −8 and +1 dB (`sceneToSpeechRange`). The drawn offset and gain are saved per mixture (`sceneRandomDB`, `sceneOffsetDB`, `sceneVolumeGain`).
-2. **Speaker balance.** The Polish part of Multilingual LibriSpeech (MLS) is dominated by one reader. The revised source table, `dataSources_v3`, adds the French, Spanish, Italian and Portuguese parts of MLS and the English LibriSpeech clean subsets. In the training subset it allows at most 200 recordings per MLS reader and 50 per LibriSpeech reader.
-3. **Data split.** The original table assigned the utterances of the Polish Read Speech corpus (PRS, the CLARIN `emu` corpus) to train / val / test one by one. The revised table assigns whole recording sessions, so the PRS split is disjoint by session. MLS and LibriSpeech keep their own corpora's partitions (MLS train / dev / test; LibriSpeech train-clean / dev-clean / test-clean).
-4. **Indoor / outdoor runs.** `sceneTypeFilter` (`'indoor'`, `'outdoor'` or `'both'`) restricts a run to indoor scenes (which get reverberation) or outdoor scenes (which do not).
-5. **Smaller fixes.** A speech recording no longer than the mixture is read whole and padded with silence on both sides. Reverberation parameter ranges are parsed once before the loop. The corpus metadata is also written as CSV.
-
 ## Speech sources in `dataSources_v3`
 
 | `source` tag | corpus | train | val | test |
@@ -42,16 +34,6 @@ Scenes come from WHAM! noise, TAU Urban Acoustic Scenes 2019 and TUT Acoustic Sc
 3. Set the output folder and name, `outputFreq` (8000 or 16000), `mixLength` (seconds, at least 4), `subset`, `sceneTypeFilter` and `howManyToGenerate`, then run the script in MATLAB. The script calls `reverberator` (Audio Toolbox) and `audioresample`.
 
 The script writes the mixtures and their layers under `outputDir/theNameofDB/subset/`. It saves the metadata of every mixture (source files, offsets, levels, reverberation parameters) as `corpus_<name>_<subset>_final.mat` and `.csv`.
-
-The corpus used in the DGSS-ASR paper (16 kHz, 4 s mixtures) was generated in six runs, one indoor and one outdoor run per subset:
-
-| subset | indoor | outdoor |
-|---|---:|---:|
-| train | 64,000 | 64,000 |
-| val | 6,400 | 6,400 |
-| test | 6,400 | 6,400 |
-
-File names are random and `rng('shuffle')` is used, so a rerun gives a different corpus drawn from the same table and split.
 
 ## Citation
 
