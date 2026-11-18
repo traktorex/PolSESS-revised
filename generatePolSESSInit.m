@@ -16,18 +16,21 @@
 % the absolute path to downloaded emu corpus: https://mowa.clarin-pl.eu/korpusy
 emuDBPath = 'C:\datasety\clarin_emu';
 
-% the path to downloaded multilingual LibriSpeech (only PL part): https://www.openslr.org/94/
+% the path to downloaded Multilingual LibriSpeech: https://www.openslr.org/94/
+% the folder that holds mls_polish, mls_french, mls_spanish, mls_italian and
+% mls_portuguese (rows with source == "libriSpeech" in dataSources_v3)
 libriSpeechPLDBPath = 'C:\datasety\mls';
 
 % the path to downloaded LibriSpeech (English, clean subsets): https://www.openslr.org/12
-libriSpeechENDBPath = 'C:\datasety\LibriMix\datasetyLibriMixdatasets';
+% the folder that holds LibriSpeech\train-clean-100, ... (rows with source == "librispeech_clean")
+libriSpeechENDBPath = 'C:\datasety';
 
 % paths to environmental scenes corpora
 
 % the path to WHAM  http://wham.whisper.ai/
 whamNoiseDBPath = 'C:\datasety\wham_noise\wham_noise';
 
-% the path to TUT 2027: https://zenodo.org/records/400515
+% the path to TUT 2017: https://zenodo.org/records/400515
 tutDBPath = 'C:\datasety\TUT-acoustic-scenes-2017';
 
 % the path to TAU-urban-acoustic-scenes
@@ -50,10 +53,10 @@ outputDir = 'C:\datasety\';
 
 % the name of the created corpus - it will be the name of the folder which
 % stores the corpus
-theNameofDB = 'PolSESS_C_final_128_v2_outdoor';
+theNameofDB = 'PolSESS_revised';
 
 % the desired frequency of output files. Can be 8000 or 16000Hz
-outputFreq = 8000;
+outputFreq = 16000;
 
 % how long should be the generated files in seconds. Default: 4 seconds.
 % Must not be less that as the files need to have at least this length
@@ -61,17 +64,17 @@ outputFreq = 8000;
 mixLength = 4;
 
 % declare how many files you want to generate for the current subset
-howManyToGenerate = 6400;
+howManyToGenerate = 64000;
 
 % type one of these: test | val | train
 % it denotes the subset you currently want to generate
-subset = 'test';
+subset = 'train';
 
 % choose the type of scenes to include: 'indoor' | 'outdoor' | 'both'
 % 'indoor' - only indoor scenes with reverberation
 % 'outdoor' - only outdoor scenes without reverberation
 % 'both' - mix of indoor and outdoor scenes
-sceneTypeFilter = 'outdoor';
+sceneTypeFilter = 'indoor';
 
 % the speech to speech ratio range when mixing two speakers
 SSRrange = [-5 5];
@@ -90,8 +93,8 @@ s = 'abcdefghijklmnopqrstuvwxyz0123456789';
 numRands = length(s);
 sLength = 16;
 
-% load the references to data sources. This file can be created using
-% generateDataSources.mat
+% load the references to data sources (the source table with the
+% train/val/test split; dataSources_v3.csv is the same table as text)
 load('dataSources_v3.mat');
 
 % load the classes of noises and events in the form of matrix which

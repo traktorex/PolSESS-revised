@@ -1,0 +1,6 @@
+# generated corpus metadata and MATLAB/editor leftovers
+corpus_*_final.mat
+corpus_*_final.csv
+*.asv
+*.m~
+.~lock.*#
