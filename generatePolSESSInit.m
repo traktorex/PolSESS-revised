@@ -86,7 +86,7 @@ sceneToSpeechRange = [-8, 1];
 
 %% here are some other constants that should not rather be changed
 
-rng('shuffle');
+%rng('shuffle');
 
 % The names of generated files are 16 randomly choosen characters
 s = 'abcdefghijklmnopqrstuvwxyz0123456789';
